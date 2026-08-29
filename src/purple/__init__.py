@@ -24,14 +24,49 @@ FIXME
             if num_outstanding == 57: do_stuff()
             num_outstanding -= 1
         only possible for commutative operations eg not for (+1) and (*2)
-        possibly things like Tuple[] also have commutative operations eg append an item and modify another item
-        no idea how to achieve this
-            only needed for clocked-simulator (but should work for atomic-rule)
-            maybe we need to define a CommutativeOperation base class
-            and store state changes as type-specific subclass objects (when needed) in LeafStateChange
-            then in Clock.event() we would merge commutative ops
-            which means finding them first across multiple invocation objects
+        Tuple[] also has compatible operations eg append an item and modify another item
+        only needed for clocked-simulator (but should work for atomic-rule)
+
+        Model.__setattr__ calls Leaf.instance-setattr then Model.announce-leaf-changes
+        leaf instance-setattr returns tuple(owner, name, cast_value)
+        announce-leaf-changes calls current-invocation.leaf-state-change
+        this stores a dict of leaf-updates and applies the change to the Model
+        each leaf only has one entry, it gets merged if changed again
+        each leaf-state-change has a value-before and a value-after and tests that when
+        being applied or reverted, the current state is what it should be
+
+        AtomicRuleSimulator invokes rules in sequence and may revert/apply as part
+        of testing rules but doesn't need to combine invocations
+
+        Clock.event invokes all the selected rules, reverting between each
+        then it re-applies all successful rules
+        so
+            leaf instance-setattr could return an additional thing to indicate a mergeable operation
+            Clock.event could flatten all the leaf changes from all concurrent rules
+            then merge those that are to the same leaf - to a single normal LeafStateChange
+            so the MergeableOperation would just be an operation-type (values are there anyway)
+            and the LeafStateChange.merge(other) would just execute them in some order
+                eg tuple.delete would need to go in index order
+
+            a mergeable operation may be already merged, which would have to happen
+            even for single-rule.  eg if you delete twice from a tuple at index 4 and 10
+            so that the replace at index 6 can be put between them.
+            looks like for Tuple, MergeableOperation would need to contain a list of ops
+            but for UpDownCounter it would only need a single op combined on the fly
+
+            incompatible ops: set-tuple-to-x is not compatible with append-to-tuple
+            and set-counter is not compatible with add-to-counter
+            so you may have to check that everything is an op
+            don't yet see a leaf with 2 or more disjoint sets of compatible ops,
+            or that this could be useful
+
+            don't try to support for Leaf-in-Union
+
+        at the moment we don't have a "revert clock event" capability
+        a merged list of leaf updates might be a way to do that
+
     add a frozen-Dictionary leaf type basically the same as Tuple
+    add a GuardedInteger[] which guards instead of errors if outside range
     declaring a state type as Tuple not Tuple[XYZ] fails silently
     start rules
         can there be more than one?  can they have parameters?

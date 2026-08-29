@@ -119,18 +119,6 @@ class Invocation:
         self.top_component._dp_raw_setattr('_dp_current_invocation', None)
         return True
 
-    def current_leaf_value(self, component, leaf_attr_name):
-        # this method is not required if changes are always immediately visible in-rule
-        # which is the case today
-        update_key = component.name, leaf_attr_name
-        latest_update = self.state_changes.get(update_key, None)
-        if latest_update is None:
-            return getattr(component, leaf_attr_name)
-        else:
-            # this can be modified to take the original or the latest
-            # depending on immediate-update-visibility
-            return latest_update.value_after
-
     def leaf_state_change(self, component, leaf_attr_name, leaf_new_value):
         update_key = component.name, leaf_attr_name
         repeated_update = self.state_changes.get(update_key, None)
